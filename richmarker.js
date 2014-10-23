@@ -25,6 +25,8 @@ goog.maps.RichMarker = function( map, opt_options )
 {
 	goog.events.EventTarget.call(this);
 	
+	var overlay;
+	
 	var options = opt_options || {};
 	
 	this.visible_ = options['visible'] || true;
@@ -41,9 +43,25 @@ goog.maps.RichMarker = function( map, opt_options )
 	
 	this.map = map;
 	
-	this.overlay = new google.maps.OverlayView();
+	/**
+	 * @constructor
+	 */
+	overlay = function(){};
+	 
+	overlay.prototype = new google.maps.OverlayView();
 	
-	this.overlay.setValues(options);
+	overlay.prototype.onAdd = goog.bind(this.onAdd, this );
+	
+	overlay.prototype.draw = goog.bind(this.draw, this);
+	
+	overlay.prototype.onRemove = goog.bind( this.onRemove,this );
+	
+	this.overlay = new overlay();
+	//this.overlay.setValues(options);
+	
+	goog.maps.RichMarker.Instances++;
+	
+	this.index_ = goog.maps.RichMarker.Instances;
 	
 	/**
 	 * Implementations:
@@ -51,12 +69,13 @@ goog.maps.RichMarker = function( map, opt_options )
 	 * has already been instantiated.
 	 * Not sure how this will interfere with another library that has also extended the OverlayView class
 	 * Ref: http://stackoverflow.com/questions/7015693/how-to-set-the-prototype-of-a-javascript-object-that-has-already-been-instantiat
+	 * Update: Found a workaround!! Dynamic prototyping Check the changes above
 	*/
-	this.overlay.constructor.prototype.onAdd = goog.bind(this.onAdd, this );
+	//overlay.constructor.prototype.onAdd = goog.bind(this.onAdd, this );
 	
-	this.overlay.constructor.prototype.draw = goog.bind(this.draw, this);
+	//this.overlay.constructor.prototype.draw = goog.bind(this.draw, this);
 	
-	this.overlay.constructor.prototype.onRemove = goog.bind( this.onRemove,this );
+	//this.overlay.constructor.prototype.onRemove = goog.bind( this.onRemove,this );
 	
 	this.overlay.setMap( this.map );
 	
@@ -88,6 +107,14 @@ goog.maps.RichMarker.Position = {
 	BOTTOM: 8,
 	BOTTOM_RIGHT: 9
 }
+
+goog.maps.RichMarker.Instances = 0;
+
+/**
+ * @type {number}
+ * @private
+ */
+goog.maps.RichMarker.prototype.index_ = 0;
 
 /**
  * @type {google.maps.OverlayView}
@@ -127,7 +154,7 @@ goog.maps.RichMarker.prototype.visible_ = true;
  * @type {boolean}
  * @private
  */
-goog.maps.RichMarker.prototype.flat_ = true;
+goog.maps.RichMarker.prototype.flat_ = false;
 
 /**
  * @type {goog.maps.RichMarker.Position|google.maps.Size}
@@ -204,6 +231,8 @@ goog.maps.RichMarker.prototype.setVisible = function( show )
  */
 goog.maps.RichMarker.prototype.onAdd = function()
 {
+	console.log( this.index_ );
+	
 	this.overlayWrapper_ = goog.dom.createDom( 'div');
 	
 	this.overlayWrapper_.style.position = 'absolute';
@@ -214,12 +243,13 @@ goog.maps.RichMarker.prototype.onAdd = function()
 	{
 		this.overlayContent_ = goog.dom.createDom('div');
 		
-		this.overlayContent_.style.position = 'relative';
+		//this.overlayContent_.style.position = 'relative';
 		
 		this.overlayWrapper_.appendChild( this.overlayContent_ );
 		
 		google.maps.event.addDomListener( this.overlayContent_, 'click', goog.bind(function(e)
 		{
+			console.log( this.index_ );
 			google.maps.event.trigger( this.overlay, 'click');
 		}, this));
 		
@@ -238,6 +268,7 @@ goog.maps.RichMarker.prototype.onAdd = function()
 	this.ready_ = true;
 	
 	this.updateContent();
+	this.updateShadow();
 	/**
 	 * Reference:
 	 * https://developers.google.com/maps/documentation/javascript/reference#MapPanes
@@ -258,7 +289,7 @@ goog.maps.RichMarker.prototype.onAdd = function()
  */
 goog.maps.RichMarker.prototype.draw = function()
 {
-	console.log( 'draw implement ');
+	//console.log( 'draw implement ');
 	if( !this.ready_ || this.isDragging_ )
 	{
 		return;
@@ -275,9 +306,9 @@ goog.maps.RichMarker.prototype.draw = function()
 	
 	offset = this.getOffset();
 	
-	this.overlayContent_.style.top = ( position.y + offset.height ) + 'px';
+	this.overlayWrapper_.style.top = ( position.y + offset.height ) + 'px';
 	
-	this.overlayContent_.style.left = ( position.x + offset.width ) + 'px';
+	this.overlayWrapper_.style.left = ( position.x + offset.width ) + 'px';
 	
 	var width = this.overlayContent_.offsetWidth,
 	
@@ -380,6 +411,15 @@ goog.maps.RichMarker.prototype.setFlat = function( isFlat )
 }
 
 /**
+ * 
+ * @return {boolean}
+ */
+goog.maps.RichMarker.prototype.isFlat = function()
+{
+	return this.flat_;
+}
+
+/**
  * Set shadow 
  * @param {string} shadow
  */
@@ -395,7 +435,7 @@ goog.maps.RichMarker.prototype.setShadow = function( shadow )
  * Get shadow 
  * @return {string}
  */
-goog.maps.RichMarker.prototype.setShadow = function()
+goog.maps.RichMarker.prototype.getShadow = function()
 {
 	return this.shadow_ ;
 }
@@ -515,7 +555,13 @@ goog.maps.RichMarker.prototype.updateVisible = function()
 
 goog.maps.RichMarker.prototype.updateShadow = function()
 {
-	
+	if ( !this.ready_ )
+	{
+		return;
+	}
+	//this.overlayContent_.style.boxShadow =
+	//this.overlayContent_.style.webkitBoxShadow =
+	//this.overlayContent_.style.MozBoxShadow = this.isFlat() ? '' : this.getShadow();
 }
 
 /**
